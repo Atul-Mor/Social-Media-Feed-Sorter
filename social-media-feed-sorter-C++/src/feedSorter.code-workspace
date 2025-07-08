@@ -1,0 +1,40 @@
+{
+	"folders": [
+		{
+			"path": "D:/c++"
+		},
+		{
+			"path": "../../../../OneDrive/Desktop/java programming"
+		},
+		{
+			"path": "../../../../OneDrive/Desktop/python"
+		},
+		{
+			"path": "D:/SIGMA2.0"
+		},
+		{
+			"path": "D:/univercity/AI_Code"
+		},
+		{
+			"path": "D:/univercity/Sem_4/AI/chatbot"
+		},
+		{
+			"path": "D:/univercity/Sem_4/ML-1/project"
+		},
+		{
+			"path": "../../../../app"
+		},
+		{
+			"path": "../../../../ML_Project"
+		},
+		{
+			"path": "../../../../OneDrive/Desktop/lama"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"iostream": "cpp"
+		},
+		"liveServer.settings.multiRootWorkspaceName": "SIGMA2.0"
+	}
+}
