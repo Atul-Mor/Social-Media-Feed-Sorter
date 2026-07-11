@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build:cpp": "g++ -std=c++17 -pthread src/Post.cpp src/FeedManager.cpp src/cli.cpp -o feed_sorter_cli.exe"
+    "build:cpp": "g++ -std=c++17 -O2 -pthread src/Post.cpp src/FeedManager.cpp src/cli.cpp -o src/feed_sorter_cli"  
   },
   "keywords": [],
   "author": "",

@@ -58,24 +58,38 @@ std::vector<size_t> FeedManager::computeChunkBounds(size_t n, unsigned numThread
     return bounds;
 }
 
-static std::function<bool(const Post&, const Post&)> comparatorFor(const std::string& mode, long nowTs) {
-    if (mode == "time") return [](const Post& a, const Post& b) { return a.timestamp > b.timestamp; };
-    if (mode == "priority") return [](const Post& a, const Post& b) {
-        if (a.userPriority != b.userPriority) return a.userPriority > b.userPriority;
-        return a.timestamp > b.timestamp;
-    };
-    if (mode == "score") return [nowTs](const Post& a, const Post& b) { return a.rankScore(nowTs) > b.rankScore(nowTs); };
-    return [](const Post& a, const Post& b) { return a.likes > b.likes; }; // default: likes
+enum class SortMode { Time, Likes, Priority, Score };
+
+static SortMode parseMode(const std::string& mode) {
+    if (mode == "time") return SortMode::Time;
+    if (mode == "priority") return SortMode::Priority;
+    if (mode == "score") return SortMode::Score;
+    return SortMode::Likes;
 }
 
-ChunkedResult FeedManager::getFeedSortedParallel(const std::string& mode, long nowTs, unsigned numThreads) const {
+static inline bool comparePosts(const Post& a, const Post& b, SortMode mode, long nowTs) {
+    switch (mode) {
+        case SortMode::Time:
+            return a.timestamp > b.timestamp;
+        case SortMode::Priority:
+            if (a.userPriority != b.userPriority) return a.userPriority > b.userPriority;
+            return a.timestamp > b.timestamp;
+        case SortMode::Score:
+            return a.rankScore(nowTs) > b.rankScore(nowTs);
+        case SortMode::Likes:
+        default:
+            return a.likes > b.likes;
+    }
+}
+
+ChunkedResult FeedManager::getFeedSortedParallel(const std::string& modeStr, long nowTs, unsigned numThreads) const {
     std::vector<Post> feed;
     {
         std::lock_guard<std::mutex> lock(feedMutex);
         feed = allPosts;
     }
 
-    auto cmp = comparatorFor(mode, nowTs);
+    SortMode mode = parseMode(modeStr);
     size_t n = feed.size();
 
     ChunkedResult result;
@@ -83,7 +97,9 @@ ChunkedResult FeedManager::getFeedSortedParallel(const std::string& mode, long n
 
     if (numThreads <= 1 || n < 2 * numThreads) {
         for (size_t i = 0; i < n; ++i) result.chunkOf[i] = 0;
-        std::sort(feed.begin(), feed.end(), cmp);
+        std::sort(feed.begin(), feed.end(), [mode, nowTs](const Post& a, const Post& b) {
+            return comparePosts(a, b, mode, nowTs);
+        });
         result.posts = std::move(feed);
         result.chunkCount = 1;
         return result;
@@ -92,15 +108,11 @@ ChunkedResult FeedManager::getFeedSortedParallel(const std::string& mode, long n
     auto bounds = computeChunkBounds(n, numThreads);
     size_t chunkCount = bounds.size() - 1;
 
-    // Tag each post with its origin chunk BEFORE any sorting happens.
     std::vector<int> originChunk(n);
     for (size_t c = 0; c < chunkCount; ++c)
         for (size_t i = bounds[c]; i < bounds[c + 1]; ++i)
             originChunk[i] = static_cast<int>(c);
 
-    // 1. Sort each chunk concurrently, on its own thread. Carry the origin
-    //    tags along with the posts (as index pairs) so we can report which
-    //    chunk each post came from after everything gets merged.
     std::vector<std::pair<Post, int>> tagged;
     tagged.reserve(n);
     for (size_t i = 0; i < n; ++i) tagged.emplace_back(feed[i], originChunk[i]);
@@ -108,16 +120,17 @@ ChunkedResult FeedManager::getFeedSortedParallel(const std::string& mode, long n
     std::vector<std::thread> workers;
     workers.reserve(chunkCount);
     for (size_t c = 0; c < chunkCount; ++c) {
-        workers.emplace_back([&tagged, &bounds, c, &cmp]() {
-            std::sort(tagged.begin() + bounds[c], tagged.begin() + bounds[c + 1],
-                      [&cmp](const std::pair<Post,int>& a, const std::pair<Post,int>& b) {
-                          return cmp(a.first, b.first);
+        size_t lo = bounds[c];
+        size_t hi = bounds[c + 1];
+        workers.emplace_back([&tagged, lo, hi, mode, nowTs]() {
+            std::sort(tagged.begin() + lo, tagged.begin() + hi,
+                      [mode, nowTs](const std::pair<Post,int>& a, const std::pair<Post,int>& b) {
+                          return comparePosts(a.first, b.first, mode, nowTs);
                       });
         });
     }
     for (auto& t : workers) t.join();
 
-    // 2. Merge sorted chunks pairwise (tree merge).
     for (size_t step = 1; step < chunkCount; step *= 2) {
         for (size_t i = 0; i + step < chunkCount; i += 2 * step) {
             size_t left = bounds[i];
@@ -125,8 +138,8 @@ ChunkedResult FeedManager::getFeedSortedParallel(const std::string& mode, long n
             size_t rightIdx = std::min(i + 2 * step, chunkCount);
             size_t right = bounds[rightIdx];
             std::inplace_merge(tagged.begin() + left, tagged.begin() + mid, tagged.begin() + right,
-                                [&cmp](const std::pair<Post,int>& a, const std::pair<Post,int>& b) {
-                                    return cmp(a.first, b.first);
+                                [mode, nowTs](const std::pair<Post,int>& a, const std::pair<Post,int>& b) {
+                                    return comparePosts(a.first, b.first, mode, nowTs);
                                 });
         }
     }

@@ -5,8 +5,8 @@
 #include "Post.h"
 
 struct ChunkedResult {
-    std::vector<Post> posts;   // final sorted posts
-    std::vector<int> chunkOf;  // chunkOf[i] = which chunk post at final index i started in (pre-merge)
+    std::vector<Post> posts;
+    std::vector<int> chunkOf;
     unsigned chunkCount;
 };
 
@@ -16,7 +16,6 @@ private:
     mutable std::mutex feedMutex;
 
     static std::vector<size_t> computeChunkBounds(size_t n, unsigned numThreads);
-
 public:
     void addPost(const Post& post);
     size_t size() const;
