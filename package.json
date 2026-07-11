@@ -1,0 +1,18 @@
+{
+  "name": "socialmediafeedsorter",
+  "version": "1.0.0",
+  "description": "This repository contains a minimal full-stack prototype for sorting and ranking a social-media feed using a lightweight Express backend and a C++ processing component.",
+  "main": "server.js",
+  "scripts": {
+    "build:cpp": "g++ -std=c++17 -O2 -pthread src/Post.cpp src/FeedManager.cpp src/cli.cpp -o src/feed_sorter_cli",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

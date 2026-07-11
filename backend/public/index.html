@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Feed Sorter — powered by C++</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Social Media Feed Sorter</h1>
+  <p class="subtitle">Every sort below runs on the real compiled multi-threaded C++ engine, not JavaScript.</p>
+
+  <div class="controls">
+    <button onclick="doSort('time')">Sort by time</button>
+    <button onclick="doSort('likes')">Sort by likes</button>
+    <button onclick="doSort('priority')">Sort by priority</button>
+    <button onclick="doSort('score')">Sort by score</button>
+    <button onclick="runParallelDemo()" class="accent">Run parallel sort demo</button>
+  </div>
+
+  <p id="status"></p>
+  <div id="grid" class="grid"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
