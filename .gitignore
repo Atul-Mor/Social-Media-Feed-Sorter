@@ -1,0 +1,7 @@
+node_modules/
+backend/src/feed_sorter_cli
+backend/src/feed_sorter_cli.exe
+backend/src/feed_sorter_debug
+backend/src/feed_sorter_o2dbg
+*.log
+.DS_Store
