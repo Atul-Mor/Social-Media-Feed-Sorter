@@ -12,7 +12,7 @@ Browser (public/) --POST /api/sort--> Express (server.js) --spawns--> feed_sorte
                                                                      (see backend/src/FeedManager.cpp)
 ```
 
-**Live demo:** _TBD — deploying to Render, link goes here once live._
+**Live demo:** https://feed-sorter.onrender.com/
 
 ## Why this design
 
