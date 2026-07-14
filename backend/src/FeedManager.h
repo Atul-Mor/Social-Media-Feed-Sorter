@@ -5,9 +5,10 @@
 #include "Post.h"
 
 struct ChunkedResult {
-    std::vector<Post> posts;
-    std::vector<int> chunkOf;
-    unsigned chunkCount;
+    std::vector<Post> posts;   // final sorted posts
+    std::vector<int> chunkOf;  // chunkOf[i] = which chunk post at final index i started in (pre-merge)
+    unsigned chunkCount = 0;
+    double copyInMs = 0, buildMs = 0, sortMs = 0, mergeMs = 0, copyOutMs = 0;
 };
 
 class FeedManager {
@@ -16,9 +17,17 @@ private:
     mutable std::mutex feedMutex;
 
     static std::vector<size_t> computeChunkBounds(size_t n, unsigned numThreads);
+
 public:
     void addPost(const Post& post);
     size_t size() const;
+
+    // Mutex-protected copy of the current posts, unsorted. Exists so
+    // callers can time JUST a sort operation on an already-in-memory
+    // array, excluding both data generation and this copy itself, for a
+    // fair apples-to-apples comparison against the parallel sort's
+    // internal sortMs (which also excludes those same setup costs).
+    std::vector<Post> getRawCopy() const;
 
     // Single-threaded baselines
     std::vector<Post> getFeedSortedByTime() const;

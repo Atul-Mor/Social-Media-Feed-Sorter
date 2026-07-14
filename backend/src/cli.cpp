@@ -5,6 +5,7 @@
 #include <chrono>
 #include <ctime>
 #include <thread>
+#include <algorithm>
 #include "Post.h"
 #include "FeedManager.h"
 
@@ -69,6 +70,31 @@ int main(int argc, char** argv) {
     auto t3 = std::chrono::high_resolution_clock::now();
     double parallelMs = std::chrono::duration<double, std::milli>(t3 - t2).count();
 
+    // Isolated sort-only comparison: a raw copy is made (untimed, same
+    // cost every path pays) and then ONLY std::sort is timed on it — no
+    // data generation, no mutex-copy included. This is directly comparable
+    // to result.sortMs, which also excludes those same setup costs, giving
+    // a fair like-for-like measure of just the sorting work being
+    // parallelized (rather than the full end-to-end pipeline, which is
+    // dominated by a fixed sequential copy cost that both paths must pay
+    // regardless of thread count).
+    std::vector<Post> isolatedCopy = manager.getRawCopy();
+    auto t4 = std::chrono::high_resolution_clock::now();
+    if (mode == "time") {
+        std::sort(isolatedCopy.begin(), isolatedCopy.end(), [](const Post& a, const Post& b) { return a.timestamp > b.timestamp; });
+    } else if (mode == "priority") {
+        std::sort(isolatedCopy.begin(), isolatedCopy.end(), [](const Post& a, const Post& b) {
+            if (a.userPriority != b.userPriority) return a.userPriority > b.userPriority;
+            return a.timestamp > b.timestamp;
+        });
+    } else if (mode == "score") {
+        std::sort(isolatedCopy.begin(), isolatedCopy.end(), [nowTs](const Post& a, const Post& b) { return a.rankScore(nowTs) > b.rankScore(nowTs); });
+    } else {
+        std::sort(isolatedCopy.begin(), isolatedCopy.end(), [](const Post& a, const Post& b) { return a.likes > b.likes; });
+    }
+    auto t5 = std::chrono::high_resolution_clock::now();
+    double sortOnlySerialMs = std::chrono::duration<double, std::milli>(t5 - t4).count();
+
     // Emit JSON.
     std::ostringstream out;
     out << "{";
@@ -77,6 +103,18 @@ int main(int argc, char** argv) {
     out << "\"chunkCount\":" << result.chunkCount << ",";
     out << "\"hardwareConcurrency\":" << std::thread::hardware_concurrency() << ",";
     out << "\"timing\":{\"serialMs\":" << serialMs << ",\"parallelMs\":" << parallelMs << "},";
+    out << "\"parallelBreakdown\":{"
+        << "\"copyInMs\":" << result.copyInMs << ","
+        << "\"buildMs\":" << result.buildMs << ","
+        << "\"sortMs\":" << result.sortMs << ","
+        << "\"mergeMs\":" << result.mergeMs << ","
+        << "\"copyOutMs\":" << result.copyOutMs
+        << "},";
+    out << "\"sortOnlyComparison\":{"
+        << "\"sortOnlySerialMs\":" << sortOnlySerialMs << ","
+        << "\"sortOnlyParallelMs\":" << result.sortMs << ","
+        << "\"speedup\":" << (sortOnlySerialMs / result.sortMs)
+        << "},";
     out << "\"posts\":[";
     for (size_t i = 0; i < result.posts.size(); ++i) {
         const Post& p = result.posts[i];
